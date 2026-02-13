@@ -244,57 +244,56 @@
 
     // --- VOICE ENGINE ---
     // 1. Unified Speech Engine
+// --- UPDATED VOICE ENGINE FOR PRODUCTION ---
 function setupVoice() {
-    // Check for browser support
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     
     if (!SpeechRecognition) {
         console.error("Speech Recognition not supported.");
-        alert("Your browser does not support Voice Recognition. Please use Chrome or Safari.");
+        alert("Voice recognition is not supported in this browser. Please try Chrome on Android or Safari on iOS.");
         return;
     }
 
-    rec = new SpeechRecognition();
-    rec.continuous = false; 
-    rec.interimResults = true; // Shows text while you talk
-    rec.lang = 'en-US';
+    // Reuse existing instance if available
+    if (!rec) {
+        rec = new SpeechRecognition();
+        rec.continuous = false; 
+        rec.interimResults = true;
+        rec.lang = 'en-US';
 
-    // UI Updates when recording starts
-    rec.onstart = () => {
-        isRecording = true;
-        document.getElementById('mic-wave').style.display = 'flex';
-        document.getElementById('micBtn').innerText = '⏹️';
-        document.getElementById('micBtn').style.opacity = '1';
-    };
+        rec.onstart = () => {
+            isRecording = true;
+            document.getElementById('mic-wave').style.display = 'flex';
+            document.getElementById('micBtn').innerText = '⏹️';
+            document.getElementById('micBtn').style.opacity = '1';
+        };
 
-    // Live update of the input field
-    rec.onresult = (e) => {
-        const transcript = Array.from(e.results)
-            .map(result => result[0])
-            .map(result => result.transcript)
-            .join('');
-        document.getElementById('userInput').value = transcript;
-    };
+        rec.onresult = (e) => {
+            const transcript = Array.from(e.results)
+                .map(result => result[0].transcript)
+                .join('');
+            document.getElementById('userInput').value = transcript;
+        };
 
-    // Auto-send when you stop talking
-    rec.onend = () => {
-        stopVoiceUI();
-        const finalVal = document.getElementById('userInput').value.trim();
-        if(finalVal !== '') {
-            handleSend();
-        }
-    };
+        rec.onend = () => {
+            stopVoiceUI();
+            const finalVal = document.getElementById('userInput').value.trim();
+            // Small delay to ensure last word is captured
+            if(finalVal !== '') {
+                setTimeout(() => handleSend(), 300);
+            }
+        };
 
-    rec.onerror = (e) => {
-        console.error("Voice Error: ", e.error);
-        stopVoiceUI();
-        if(e.error === 'not-allowed') {
-            alert("Microphone access denied. Please enable it in your browser settings.");
-        }
-    };
+        rec.onerror = (e) => {
+            console.error("Voice Error: ", e.error);
+            stopVoiceUI();
+            if(e.error === 'not-allowed') {
+                alert("Microphone blocked. Click the 'Lock' icon in your browser URL bar and set Microphone to 'Allow'.");
+            }
+        };
+    }
 }
 
-// 2. UI Reset Helper
 function stopVoiceUI() {
     isRecording = false;
     document.getElementById('mic-wave').style.display = 'none';
@@ -302,28 +301,23 @@ function stopVoiceUI() {
     document.getElementById('micBtn').style.opacity = '0.6';
 }
 
-// 3. The Toggle Function (Triggered by your button)
 function handleVoice() {
-    // Initialize if it hasn't been yet
+    // 1. Initialize on first click (User Gesture)
     if (!rec) setupVoice();
-    
-    if (!rec) return; // Exit if still no support
+    if (!rec) return;
 
     if (isRecording) {
         rec.stop();
     } else {
-        // Clear input for new recording
         document.getElementById('userInput').value = ''; 
         try {
             rec.start();
         } catch (err) {
-            console.error("Start error: ", err);
-            // If already started, just stop it
+            console.warn("Rec already active or error:", err);
             rec.stop();
         }
     }
 }
-
     // --- CORE LOGIC ---
     function toggleToolsPopup() {
         const popup = document.getElementById('tools-popup');
