@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emrys AI</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        :root {
+            --bg: #f8f6fb; --sidebar: rgba(255, 255, 255, 0.5); --card: rgba(255, 255, 255, 0.5);
+            --text: #1e103c; --border: rgba(0, 0, 0, 0.06); --accent: #7c3aed;
+            --accent-glow: rgba(124, 58, 237, 0.3); --glass: rgba(255, 255, 255, 0.1);
+            --nebula: radial-gradient(circle at 50% 50%, #ede9fe 0%, #fdfdfd 100%); --error: #ff3366;
+        }
+        [data-theme="dark"] {
+            --bg: #0b0514; --sidebar: rgba(20, 10, 35, 0.4); --card: rgba(30, 15, 55, 0.3);
+            --text: #e9e4f0; --border: rgba(255, 255, 255, 0.06); --accent: #00e5ff;
+            --accent-glow: rgba(0, 229, 255, 0.4); --glass: rgba(255, 255, 255, 0.02);
+            --nebula: radial-gradient(circle at 20% 20%, #1c0a35 0%, #04010a 100%);
+        }
+
+        /* MODERN SCROLLBAR */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(16, 185, 129, 0.2); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; overflow: hidden; position: relative; }
+        body::before { content: ""; position: absolute; width: 200%; height: 200%; top: -50%; left: -50%; background: var(--nebula); z-index: -1; animation: meshRotation 60s infinite linear; opacity: 0.8; }
+        @keyframes meshRotation { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        /* LOADING SCREEN */
+        #loading-screen { position: fixed; inset: 0; background: var(--bg); z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; transition: opacity 0.6s ease; }
+        .loader-spinner { width: 50px; height: 50px; border: 4px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; }
+        .loader-text { font-size: 2rem; font-weight: 900; letter-spacing: 4px; color: var(--accent); text-transform: uppercase; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* SIDEBAR TOGGLE */
+        #sidebar-toggle { position: absolute; top: 15px; left: 15px; z-index: 100; cursor: pointer; background: var(--card); border: 1px solid var(--border); padding: 8px 12px; border-radius: 10px; font-size: 1.2rem; backdrop-filter: blur(10px); }
+        nav { width: 320px; background: var(--sidebar); backdrop-filter: blur(40px); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 25px; gap: 15px; z-index: 50; position: relative; margin-left: 0; }
+        body.sidebar-closed nav { margin-left: -320px; }
+
+        .brand { font-weight: 900; font-size: 1.7rem; display: flex; align-items: center; gap: 12px; letter-spacing: -1px; margin-top: 40px; }
+        .brand-logo-svg { width: 40px; fill: var(--accent); cursor: pointer; }
+        
+        #history-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; mask-image: linear-gradient(to bottom, black 90%, transparent); margin-bottom: 20px;}
+        .history-item { padding: 12px; border-radius: 12px; font-size: 0.8rem; cursor: pointer; background: var(--glass); border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
+        .history-item.active { background: var(--accent); color: #000; }
+        .del-btn { opacity: 0.4; color: var(--error); padding: 5px; font-weight: 900; cursor: pointer; }
+        .del-btn:hover { opacity: 1; transform: scale(1.2); }
+
+        /* USER ACCOUNT AREA */
+        .user-card { background: var(--card); border: 1px solid var(--border); padding: 12px; border-radius: 18px; display: flex; align-items: center; gap: 10px; }
+        .user-avatar { width: 35px; height: 35px; background: var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #000; font-weight: 800; }
+        .user-info { flex: 1; overflow: hidden; }
+        .user-info div { font-size: 0.75rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .logout-btn { cursor: pointer; font-size: 0.7rem; opacity: 0.5; font-weight: 700; text-transform: uppercase; }
+
+        /* MAIN UI */
+        main { flex: 1; display: flex; flex-direction: column; align-items: center; position: relative; min-width: 0; }
+        .system-top-header { width: 100%; padding: 15px; text-align: center; font-weight: 800; color: var(--accent); font-size: 0.8rem; letter-spacing: 1px; }
+        #chat-window { width: 100%; max-width: 850px; flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 25px; scrollbar-gutter: stable; mask-image: linear-gradient(to bottom, transparent, black 8%, black 92%, transparent); }
+        
+        .message { max-width: 85%; padding: 18px 22px; border-radius: 24px; font-size: 0.95rem; line-height: 1.6; }
+        .user { align-self: flex-end; background: var(--card); border: 1px solid var(--border); border-bottom-right-radius: 4px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .ai { align-self: flex-start; border-left: 3px solid var(--accent); background: transparent; padding-left: 20px; }
+
+        /* FILE PREVIEW */
+        #file-pill { display: none; background: var(--accent); color: #000; padding: 5px 12px; border-radius: 20px; font-size: 0.7rem; font-weight: 800; margin-bottom: 10px; align-self: flex-start; gap: 8px; align-items: center; }
+
+        .input-area { width: 100%; max-width: 850px; padding: 25px; display: flex; flex-direction: column; position: relative; }
+        .input-box { background: var(--card); border: 1px solid var(--border); padding: 8px 20px; border-radius: 40px; display: flex; align-items: center; gap: 15px; backdrop-filter: blur(20px); z-index: 10;}
+        #userInput { flex: 1; border: none; background: transparent; outline: none; color: var(--text); font-size: 1rem; }
+        
+        /* TOOLS POPUP (Moved from sidebar) */
+        .tools-popup { display: none; position: absolute; bottom: 90px; left: 25px; background: var(--card); backdrop-filter: blur(30px); border: 1px solid var(--border); padding: 15px; border-radius: 20px; grid-template-columns: repeat(3, 1fr); gap: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); z-index: 20; transform: translateY(10px); opacity: 0; transition: transform 0.3s ease, opacity 0.3s ease; }
+        .tools-popup.show { display: grid; transform: translateY(0); opacity: 1; }
+        .tool-btn { background: var(--glass); border: 1px solid var(--border); color: var(--text); padding: 10px; border-radius: 12px; cursor: pointer; display: flex; flex-direction: column; align-items: center; font-size: 1.4rem; opacity: 0.8; transition: 0.2s; }
+        .tool-btn:hover { opacity: 1; transform: translateY(-3px); background: var(--accent-glow); border-color: var(--accent); }
+        .tool-label { font-size: 0.65rem; font-weight: 800; margin-top: 6px; }
+
+        /* MIC WAVE ANIMATION */
+        #mic-wave { display: none; align-items: center; gap: 4px; margin-right: 5px; height: 20px; }
+        .wave-bar { width: 4px; background: var(--accent); border-radius: 2px; animation: wave 0.8s infinite alternate; }
+        @keyframes wave { 0% { height: 5px; } 100% { height: 20px; } }
+
+        /* AI SPECTRUM */
+        #ai-spectrum { position: fixed; top: 0; left: 0; width: 100%; height: 4px; background: var(--accent); transform: scaleX(0); transition: 0.1s; z-index: 10000; box-shadow: 0 0 15px var(--accent); }
+
+        canvas { margin-top: 15px; background: rgba(255,255,255,0.02); border-radius: 15px; padding: 10px; }
+        .execute-btn { margin-top: 10px; padding: 8px 16px; background: var(--accent); color: #000; border: none; border-radius: 12px; font-weight: 800; cursor: pointer; font-size: 0.75rem; }
+
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.9); backdrop-filter: blur(15px); display: none; align-items: center; justify-content: center; z-index: 2000; }
+        .modal-content { background: var(--bg); padding: 40px; border-radius: 30px; width: 380px; text-align: center; border: 1px solid var(--border); }
+    </style>
+</head>
+<body data-theme="dark">
+
+<div id="ai-spectrum"></div>
+<div id="sidebar-toggle" onclick="toggleSidebar()">☰</div>
+
+<div id="loading-screen">
+    <div class="loader-spinner"></div>
+    <div class="loader-text">Emrys AI</div>
+</div>
+
+<div class="modal" id="authModal">
+    <div class="modal-content">
+        <h2 style="margin-bottom:10px;">Login/Sign Up</h2>
+        <input type="text" id="regName" style="width:100%; padding:12px; margin:10px 0; border-radius:12px; border:1px solid var(--border); background:var(--glass); color:var(--text);" placeholder="Display Name">
+        <input type="email" id="regEmail" style="width:100%; padding:12px; margin:10px 0; border-radius:12px; border:1px solid var(--border); background:var(--glass); color:var(--text);" placeholder="Email Address">
+        <button onclick="doAuth()" style="background:var(--accent); color:#000; border:none; padding:12px; border-radius:15px; cursor:pointer; font-weight:800; width:100%; margin-top:15px;">INITIALIZE ACCESS</button>
+    </div>
+</div>
+
+<nav id="sidebar">
+    <div class="brand">
+        <svg class="brand-logo-svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" stroke-width="6"/><path d="M30 40 H70 M30 50 H60 M30 60 H70" stroke="currentColor" stroke-width="8"/></svg>
+        EMRYS AI
+    </div>
+
+    <div class="user-card" id="userDisplay" style="display:none;">
+        <div class="user-avatar" id="avatarIcon">U</div>
+        <div class="user-info">
+            <div id="uName">User</div>
+            <span class="logout-btn" onclick="logout()">Disconnect</span>
+        </div>
+    </div>
+
+    <div style="background:var(--card); padding:12px; border-radius:15px; font-size:0.6rem; border:1px solid var(--border);">
+        <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span>SYSTEM LOAD</span><span id="load-val">2%</span></div>
+        <div style="height:3px; background:rgba(255,255,255,0.1); border-radius:2px;"><div id="load-bar" style="width:2%; height:100%; background:var(--accent); transition:0.4s;"></div></div>
+        <div style="margin-top:8px; opacity:0.5; font-weight:700;">UPTIME: <span id="uptime-val">00:00:00</span></div>
+    </div>
+
+    <button onclick="createNewChat()" style="background:var(--accent); color:#000; border:none; padding:12px; border-radius:15px; cursor:pointer; font-weight:800; width:100%;">+ NEW CANVAS</button>
+    
+    <div id="history-list"></div>
+</nav>
+
+<main>
+    <div class="system-top-header"><span id="header-msg">Emrys AI V1 Online</span></div>
+    <div id="chat-window"></div>
+    
+    <div class="input-area">
+        <div id="file-pill"><span>file.txt</span><span onclick="clearFile()" style="cursor:pointer; margin-left:5px;">✕</span></div>
+        
+        <div id="tools-popup" class="tools-popup">
+            <button onclick="toggleTheme()" class="tool-btn"><span>🌓</span><span class="tool-label">Mode</span></button>
+            <button onclick="toggleMute()" class="tool-btn" id="muteBtn"><span>🔊</span><span class="tool-label">Sound</span></button>
+            <button onclick="setMemory()" class="tool-btn"><span>🧠</span><span class="tool-label">Memory</span></button>
+            <button onclick="wipeAll()" class="tool-btn"><span>🗑️</span><span class="tool-label">Wipe All</span></button>
+            <button onclick="exportJSON()" class="tool-btn"><span>📥</span><span class="tool-label">Export</span></button>
+        </div>
+
+        <div class="input-box">
+            <span onclick="toggleToolsPopup()" style="cursor:pointer; opacity:0.6; font-size:1.4rem; transition: 0.3s;" id="toolsToggleBtn">⚙️</span>
+            
+            <span onclick="document.getElementById('fIn').click()" style="cursor:pointer; opacity:0.5; font-size:1.4rem; margin-left:5px;">📎</span>
+            <input type="file" id="fIn" hidden onchange="handleFile(this)">
+            
+            <div id="mic-wave">
+                <div class="wave-bar" style="animation-delay:0s"></div>
+                <div class="wave-bar" style="animation-delay:0.2s"></div>
+                <div class="wave-bar" style="animation-delay:0.4s"></div>
+            </div>
+
+            <input type="text" id="userInput" placeholder="Command Emrys..." autocomplete="off">
+            <button onclick="handleVoice()" id="micBtn" style="background:none; border:none; font-size:1.4rem; cursor:pointer; opacity:0.6;">🎤</button>
+            <button class="send-btn" onclick="handleSend()" style="background:var(--accent); border:none; padding:8px 20px; border-radius:20px; font-weight:800; cursor:pointer;">SEND</button>
+        </div>
+        <div style="text-align:center; font-size:0.55rem; margin-top:10px; opacity:0.4; letter-spacing:1px; font-weight:800;">2029 BATCH DEERWALK SIFAL SCHOOL</div>
+    </div>
+</main>
+
+<script>
+    const API = { k: "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", u: "https://openrouter.ai/api/v1/chat/completions" };
+    let user = JSON.parse(localStorage.getItem('em_u')), chats = JSON.parse(localStorage.getItem('em_c')) || {};
+    let memory = localStorage.getItem('em_m') || "Standard Operation";
+    let curId = null, muted = false, fileData = null, rec = null, isRecording = false, startTime = Date.now();
+
+    window.onload = () => {
+        setTimeout(() => {
+            const ls = document.getElementById('loading-screen');
+            ls.style.opacity = '0';
+            setTimeout(() => ls.style.display = 'none', 600);
+        }, 1200);
+
+        if(!user) document.getElementById('authModal').style.display='flex';
+        else updateAccountUI();
+        if(Object.keys(chats).length === 0) createNewChat();
+        else loadChat(Object.keys(chats).sort().pop());
+        setupVoice();
+        setInterval(updateSystem, 1000);
+
+        // Close tools popup when clicking outside
+        document.addEventListener('click', (e) => {
+            const popup = document.getElementById('tools-popup');
+            const toggleBtn = document.getElementById('toolsToggleBtn');
+            if (popup.classList.contains('show') && !popup.contains(e.target) && e.target !== toggleBtn) {
+                popup.classList.remove('show');
+                toggleBtn.style.opacity = '0.6';
+                toggleBtn.style.transform = 'rotate(0deg)';
+            }
+        });
+    };
+
+    function toggleToolsPopup() {
+        const popup = document.getElementById('tools-popup');
+        const btn = document.getElementById('toolsToggleBtn');
+        popup.classList.toggle('show');
+        if(popup.classList.contains('show')) {
+            btn.style.opacity = '1';
+            btn.style.transform = 'rotate(90deg)';
+        } else {
+            btn.style.opacity = '0.6';
+            btn.style.transform = 'rotate(0deg)';
+        }
+    }
+
+    function toggleSidebar() { document.body.classList.toggle('sidebar-closed'); }
+
+    function updateSystem() {
+        const d = Math.floor((Date.now() - startTime) / 1000);
+        document.getElementById('uptime-val').innerText = new Date(d * 1000).toISOString().substr(11, 8);
+        if(!window.speechSynthesis.speaking) updateLoad(Math.floor(Math.random() * 4) + 1);
+    }
+
+    function updateLoad(v) {
+        document.getElementById('load-val').innerText = v + "%";
+        document.getElementById('load-bar').style.width = v + "%";
+    }
+
+    function doAuth() {
+        const n = document.getElementById('regName').value;
+        if(n) { user = {n}; localStorage.setItem('em_u', JSON.stringify(user)); document.getElementById('authModal').style.display='none'; updateAccountUI(); }
+    }
+
+    function updateAccountUI() {
+        document.getElementById('userDisplay').style.display = 'flex';
+        document.getElementById('uName').innerText = user.n;
+        document.getElementById('avatarIcon').innerText = user.n[0].toUpperCase();
+    }
+
+    function logout() { localStorage.clear(); location.reload(); }
+
+    function createNewChat() {
+        curId = Date.now();
+        chats[curId] = {title: "New Session", msgs: [{role:'system', content:`Emrys OS. Persistent Memory: ${memory}`}, {role:'assistant', content:'Emrys Online. Canvas Ready.'}]};
+        save(); loadChat(curId);
+    }
+
+    function loadChat(id) {
+        curId = id; const w = document.getElementById('chat-window'); w.innerHTML = '';
+        chats[id].msgs.forEach(m => { if(m.role !== 'system') appendUI(m.content, m.role); });
+        renderHistory();
+    }
+
+    function deleteChat(id, e) {
+        e.stopPropagation();
+        if(confirm("Delete this canvas?")) {
+            delete chats[id]; save();
+            if(Object.keys(chats).length === 0) createNewChat();
+            else loadChat(Object.keys(chats).sort().pop());
+        }
+    }
+
+    function renderHistory() {
+        const l = document.getElementById('history-list'); l.innerHTML = '';
+        Object.keys(chats).sort().reverse().forEach(id => {
+            const i = document.createElement('div');
+            i.className = `history-item ${id == curId ? 'active' : ''}`;
+            i.innerHTML = `<span>${chats[id].title}</span><span class="del-btn" onclick="deleteChat(${id}, event)">✕</span>`;
+            i.onclick = () => loadChat(id);
+            l.appendChild(i);
+        });
+    }
+
+    function handleFile(input) {
+        fileData = input.files[0];
+        if(fileData) {
+            document.getElementById('file-pill').style.display = 'flex';
+            document.getElementById('file-pill').querySelector('span').innerText = fileData.name;
+        }
+    }
+
+    function clearFile() { fileData = null; document.getElementById('file-pill').style.display = 'none'; }
+
+    async function handleSend() {
+        const i = document.getElementById('userInput'), v = i.value.trim();
+        if(!v && !fileData) return;
+        updateLoad(85);
+
+        if(chats[curId].title === "New Session" && v) {
+            chats[curId].title = v.substring(0, 18) + (v.length > 18 ? ".." : "");
+        }
+
+        if(fileData) {
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                chats[curId].msgs.push({role:'system', content: `Context from File: ${e.target.result}`});
+                appendUI(`📎 Attached: ${fileData.name}`, 'user');
+                clearFile();
+                processAI(v);
+            };
+            reader.readAsText(fileData);
+        } else {
+            appendUI(v, 'user');
+            chats[curId].msgs.push({role:'user', content: v});
+            i.value = '';
+            processAI();
+        }
+    }
+
+    async function processAI() {
+        const loader = document.createElement('div'); loader.className = 'message ai'; loader.innerHTML = "<i>Neural Thinking...</i>";
+        document.getElementById('chat-window').appendChild(loader);
+
+        try {
+            const r = await fetch(API.u, { 
+                method:'POST', 
+                headers:{'Authorization':`Bearer ${API.k}`, 'Content-Type':'application/json'}, 
+                body:JSON.stringify({model:"openai/gpt-3.5-turbo", messages:chats[curId].msgs})
+            });
+            const d = await r.json();
+            const res = d.choices[0].message.content;
+            loader.remove();
+            appendUI(res, 'ai');
+            chats[curId].msgs.push({role:'assistant', content:res});
+            save();
+            speak(res);
+        } catch(e) { loader.innerText = "Error linking to neural network."; }
+        updateLoad(4);
+    }
+
+    function appendUI(c, r) {
+        const w = document.getElementById('chat-window'), d = document.createElement('div');
+        d.className = `message ${r}`;
+
+        if(c.includes('labels') && c.includes('datasets')) {
+            try {
+                const data = JSON.parse(c.match(/\{[\s\S]*\}/)[0]);
+                const can = document.createElement('canvas');
+                d.appendChild(can);
+                setTimeout(() => new Chart(can, {type:'bar', data}), 100);
+            } catch(e) {}
+        }
+
+        const txt = document.createElement('div');
+        txt.innerHTML = marked.parse(c);
+        d.appendChild(txt);
+
+        if(c.includes('```')) {
+            const btn = document.createElement('button');
+            btn.className = "execute-btn"; btn.innerHTML = "⚡ EXECUTE CODE";
+            btn.onclick = () => {
+                const code = c.match(/```(?:html|javascript)?([\s\S]*?)```/)[1];
+                const win = window.open(); win.document.write(code); win.document.close();
+            };
+            d.appendChild(btn);
+        }
+
+        w.appendChild(d);
+        w.scrollTo({top:w.scrollHeight, behavior:'smooth'});
+    }
+
+    function speak(t) {
+        if(muted) return;
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(t.replace(/[#*`]/g, ''));
+        const spec = document.getElementById('ai-spectrum');
+        u.onstart = () => {
+            let pulse = setInterval(() => {
+                if(!window.speechSynthesis.speaking) { clearInterval(pulse); spec.style.transform = 'scaleX(0)'; return; }
+                spec.style.transform = `scaleX(${0.1 + Math.random() * 0.9})`;
+            }, 80);
+        };
+        window.speechSynthesis.speak(u);
+    }
+
+    function setupVoice() {
+        const S = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if(S) {
+            rec = new S();
+            rec.onresult = (e) => { 
+                document.getElementById('userInput').value = e.results[0][0].transcript; 
+            };
+            rec.onend = () => {
+                isRecording = false;
+                document.getElementById('mic-wave').style.display = 'none';
+                document.getElementById('micBtn').style.opacity = '0.6';
+                if(document.getElementById('userInput').value.trim() !== '') handleSend();
+            };
+        }
+    }
+
+    function handleVoice() {
+        if(!rec) return;
+        if(isRecording) { rec.stop(); } else {
+            rec.start();
+            isRecording = true;
+            document.getElementById('mic-wave').style.display = 'flex';
+            document.getElementById('micBtn').style.opacity = '1';
+        }
+    }
+    
+    function save() { localStorage.setItem('em_c', JSON.stringify(chats)); }
+    function toggleTheme() { document.body.dataset.theme = document.body.dataset.theme === 'dark' ? 'light' : 'dark'; }
+    function toggleMute() { muted = !muted; document.getElementById('muteBtn').querySelector('span').innerText = muted ? "🔇" : "🔊"; }
+    function setMemory() { const m = prompt("Persistent Memory:", memory); if(m) { memory = m; localStorage.setItem('em_m', m); } }
+    function wipeAll() { if(confirm("Wipe all system data?")) { localStorage.clear(); location.reload(); } }
+    function exportJSON() { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(chats[curId])], {type:'application/json'})); a.download = `Emrys_Export.json`; a.click(); }
+    document.getElementById('userInput').addEventListener('keydown', (e) => { if(e.key==='Enter') handleSend(); });
+
+    function setupVoice() {
+        const S = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if(S) {
+            rec = new S();
+            // This allows the AI to show text in the bar while you are still talking
+            rec.interimResults = true; 
+            
+            rec.onresult = (e) => { 
+                const transcript = Array.from(e.results)
+                    .map(result => result[0])
+                    .map(result => result.transcript)
+                    .join('');
+                
+                // Updates the input bar in real-time
+                document.getElementById('userInput').value = transcript; 
+            };
+
+            rec.onend = () => {
+                isRecording = false;
+                document.getElementById('mic-wave').style.display = 'none';
+                document.getElementById('micBtn').style.opacity = '0.6';
+                document.getElementById('micBtn').innerText = '🎤';
+                
+                // Small delay to ensure the final transcript is captured before sending
+                setTimeout(() => {
+                    if(document.getElementById('userInput').value.trim() !== '') {
+                        handleSend();
+                    }
+                }, 500);
+            };
+        }
+    }
+
+    function handleVoice() {
+        if(!rec) return;
+        if(isRecording) { 
+            rec.stop(); 
+            document.getElementById('micBtn').innerText = '🎤';
+        } else {
+            // Clear the bar for a fresh recording
+            document.getElementById('userInput').value = ''; 
+            rec.start();
+            isRecording = true;
+            document.getElementById('mic-wave').style.display = 'flex';
+            document.getElementById('micBtn').style.opacity = '1';
+            document.getElementById('micBtn').innerText = '⏹️';
+        }
+    }
+</script>
+
+</body>
+</html>
