@@ -317,6 +317,13 @@ function handleVoice() {
             rec.stop();
         }
     }
+    // Add this to ensure the audio context isn't 'suspended' on PC
+    if (window.AudioContext && AudioContext.state === 'suspended') {
+        new AudioContext().resume();
+    }
+
+    if (!rec) setupVoice();
+    // ... rest of your code
 }
     // --- CORE LOGIC ---
     function toggleToolsPopup() {
