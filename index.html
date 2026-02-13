@@ -9,6 +9,39 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <style>
+        body {
+    /* Use dvh (Dynamic Viewport Height) for mobile Chrome */
+    height: 100dvh; 
+    overscroll-behavior: none; /* Stops the "pull-to-refresh" glitch */
+}
+
+.input-area {
+    /* Prevents the home bar on iPhone/Android from covering the input */
+    padding-bottom: calc(15px + env(safe-area-inset-bottom)); 
+}
+
+#sidebar-toggle {
+    /* Keeps the button out of the camera notch area */
+    top: calc(15px + env(safe-area-inset-top)); 
+}
+ /* PC / Desktop Adjustments */
+@media (min-width: 1024px) {
+    nav { 
+        position: relative; 
+        left: 0; 
+        transform: none; 
+        transition: none;
+    }
+    
+    #sidebar-toggle, #overlay { 
+        display: none !important; 
+    }
+    
+    #chat-window { 
+        max-width: 900px; 
+        margin: 0 auto; 
+    }
+}
         :root {
             --bg: #f8f6fb; --sidebar: rgba(255, 255, 255, 0.5); --card: rgba(255, 255, 255, 0.5);
             --text: #1e103c; --border: rgba(0, 0, 0, 0.06); --accent: #7c3aed;
@@ -464,6 +497,24 @@
             document.getElementById('micBtn').innerText = '⏹️';
         }
     }
+function toggleNav() {
+    // Only triggers on screens smaller than 1024px
+    if (window.innerWidth < 1024) {
+        const nav = document.getElementById('sidebar');
+        const overlay = document.getElementById('overlay');
+        const btn = document.getElementById('sidebar-toggle');
+        
+        nav.classList.toggle('open');
+        const isOpen = nav.classList.contains('open');
+        overlay.style.display = isOpen ? 'block' : 'none';
+        btn.innerText = isOpen ? 'CLOSE' : 'MENU';
+    }
+}
+// Add this inside your sendMsg() function after appending the user message
+setTimeout(() => {
+    const win = document.getElementById('chat-window');
+    win.scrollTo({top: win.scrollHeight, behavior: 'smooth'});
+}, 100); // 100ms delay helps account for the mobile keyboard popping up
 </script>
 
 </body>
