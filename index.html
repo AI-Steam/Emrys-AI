@@ -227,10 +227,10 @@
         else updateAccountUI();
         if(Object.keys(chats).length === 0) createNewChat();
         else loadChat(Object.keys(chats).sort().pop());
-        setupVoice();
+        
+        setupVoice(); // Initialize speech engine
         setInterval(updateSystem, 1000);
 
-        // Close tools popup when clicking outside
         document.addEventListener('click', (e) => {
             const popup = document.getElementById('tools-popup');
             const toggleBtn = document.getElementById('toolsToggleBtn');
@@ -242,17 +242,71 @@
         });
     };
 
+    // --- VOICE ENGINE ---
+    function setupVoice() {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            console.error("Speech Recognition not supported in this browser.");
+            document.getElementById('micBtn').style.display = 'none';
+            return;
+        }
+
+        rec = new SpeechRecognition();
+        rec.continuous = false; // Set to true if you want it to keep listening
+        rec.interimResults = true;
+        rec.lang = 'en-US';
+
+        rec.onstart = () => {
+            isRecording = true;
+            document.getElementById('mic-wave').style.display = 'flex';
+            document.getElementById('micBtn').innerText = '⏹️';
+            document.getElementById('micBtn').style.opacity = '1';
+        };
+
+        rec.onresult = (e) => {
+            let transcript = Array.from(e.results)
+                .map(result => result[0].transcript)
+                .join('');
+            document.getElementById('userInput').value = transcript;
+        };
+
+        rec.onerror = (e) => {
+            console.error("Speech Error:", e.error);
+            stopVoiceUI();
+        };
+
+        rec.onend = () => {
+            stopVoiceUI();
+            if(document.getElementById('userInput').value.trim() !== '') {
+                handleSend();
+            }
+        };
+    }
+
+    function stopVoiceUI() {
+        isRecording = false;
+        document.getElementById('mic-wave').style.display = 'none';
+        document.getElementById('micBtn').innerText = '🎤';
+        document.getElementById('micBtn').style.opacity = '0.6';
+    }
+
+    function handleVoice() {
+        if (!rec) return;
+        if (isRecording) {
+            rec.stop();
+        } else {
+            document.getElementById('userInput').value = '';
+            rec.start();
+        }
+    }
+
+    // --- CORE LOGIC ---
     function toggleToolsPopup() {
         const popup = document.getElementById('tools-popup');
         const btn = document.getElementById('toolsToggleBtn');
         popup.classList.toggle('show');
-        if(popup.classList.contains('show')) {
-            btn.style.opacity = '1';
-            btn.style.transform = 'rotate(90deg)';
-        } else {
-            btn.style.opacity = '0.6';
-            btn.style.transform = 'rotate(0deg)';
-        }
+        btn.style.transform = popup.classList.contains('show') ? 'rotate(90deg)' : 'rotate(0deg)';
+        btn.style.opacity = popup.classList.contains('show') ? '1' : '0.6';
     }
 
     function toggleSidebar() { document.body.classList.toggle('sidebar-closed'); }
@@ -398,7 +452,9 @@
         }
 
         w.appendChild(d);
-        w.scrollTo({top:w.scrollHeight, behavior:'smooth'});
+        setTimeout(() => {
+            w.scrollTo({top: w.scrollHeight, behavior: 'smooth'});
+        }, 100);
     }
 
     function speak(t) {
@@ -415,106 +471,23 @@
         window.speechSynthesis.speak(u);
     }
 
-    function setupVoice() {
-        const S = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if(S) {
-            rec = new S();
-            rec.onresult = (e) => { 
-                document.getElementById('userInput').value = e.results[0][0].transcript; 
-            };
-            rec.onend = () => {
-                isRecording = false;
-                document.getElementById('mic-wave').style.display = 'none';
-                document.getElementById('micBtn').style.opacity = '0.6';
-                if(document.getElementById('userInput').value.trim() !== '') handleSend();
-            };
-        }
-    }
-
-    function handleVoice() {
-        if(!rec) return;
-        if(isRecording) { rec.stop(); } else {
-            rec.start();
-            isRecording = true;
-            document.getElementById('mic-wave').style.display = 'flex';
-            document.getElementById('micBtn').style.opacity = '1';
-        }
-    }
-    
     function save() { localStorage.setItem('em_c', JSON.stringify(chats)); }
     function toggleTheme() { document.body.dataset.theme = document.body.dataset.theme === 'dark' ? 'light' : 'dark'; }
     function toggleMute() { muted = !muted; document.getElementById('muteBtn').querySelector('span').innerText = muted ? "🔇" : "🔊"; }
     function setMemory() { const m = prompt("Persistent Memory:", memory); if(m) { memory = m; localStorage.setItem('em_m', m); } }
     function wipeAll() { if(confirm("Wipe all system data?")) { localStorage.clear(); location.reload(); } }
     function exportJSON() { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(chats[curId])], {type:'application/json'})); a.download = `Emrys_Export.json`; a.click(); }
+    
     document.getElementById('userInput').addEventListener('keydown', (e) => { if(e.key==='Enter') handleSend(); });
 
-    function setupVoice() {
-        const S = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if(S) {
-            rec = new S();
-            // This allows the AI to show text in the bar while you are still talking
-            rec.interimResults = true; 
-            
-            rec.onresult = (e) => { 
-                const transcript = Array.from(e.results)
-                    .map(result => result[0])
-                    .map(result => result.transcript)
-                    .join('');
-                
-                // Updates the input bar in real-time
-                document.getElementById('userInput').value = transcript; 
-            };
-
-            rec.onend = () => {
-                isRecording = false;
-                document.getElementById('mic-wave').style.display = 'none';
-                document.getElementById('micBtn').style.opacity = '0.6';
-                document.getElementById('micBtn').innerText = '🎤';
-                
-                // Small delay to ensure the final transcript is captured before sending
-                setTimeout(() => {
-                    if(document.getElementById('userInput').value.trim() !== '') {
-                        handleSend();
-                    }
-                }, 500);
-            };
+    function toggleNav() {
+        if (window.innerWidth < 1024) {
+            const nav = document.getElementById('sidebar');
+            const btn = document.getElementById('sidebar-toggle');
+            document.body.classList.toggle('sidebar-closed');
+            btn.innerText = document.body.classList.contains('sidebar-closed') ? '☰' : '✕';
         }
     }
-
-    function handleVoice() {
-        if(!rec) return;
-        if(isRecording) { 
-            rec.stop(); 
-            document.getElementById('micBtn').innerText = '🎤';
-        } else {
-            // Clear the bar for a fresh recording
-            document.getElementById('userInput').value = ''; 
-            rec.start();
-            isRecording = true;
-            document.getElementById('mic-wave').style.display = 'flex';
-            document.getElementById('micBtn').style.opacity = '1';
-            document.getElementById('micBtn').innerText = '⏹️';
-        }
-    }
-function toggleNav() {
-    // Only triggers on screens smaller than 1024px
-    if (window.innerWidth < 1024) {
-        const nav = document.getElementById('sidebar');
-        const overlay = document.getElementById('overlay');
-        const btn = document.getElementById('sidebar-toggle');
-        
-        nav.classList.toggle('open');
-        const isOpen = nav.classList.contains('open');
-        overlay.style.display = isOpen ? 'block' : 'none';
-        btn.innerText = isOpen ? 'CLOSE' : 'MENU';
-    }
-}
-// Add this inside your sendMsg() function after appending the user message
-setTimeout(() => {
-    const win = document.getElementById('chat-window');
-    win.scrollTo({top: win.scrollHeight, behavior: 'smooth'});
-}, 100); // 100ms delay helps account for the mobile keyboard popping up
 </script>
 
 </body>
