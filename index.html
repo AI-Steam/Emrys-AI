@@ -242,19 +242,16 @@
         });
     };
 
-    // --- VOICE ENGINE ---
-    // 1. Unified Speech Engine
-// --- UPDATED VOICE ENGINE FOR PRODUCTION ---
+    // --- FIXED VOICE ENGINE ---
 function setupVoice() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     
     if (!SpeechRecognition) {
         console.error("Speech Recognition not supported.");
-        alert("Voice recognition is not supported in this browser. Please try Chrome on Android or Safari on iOS.");
+        alert("Voice recognition is not supported in this browser. Please use Chrome or Edge.");
         return;
     }
 
-    // Reuse existing instance if available
     if (!rec) {
         rec = new SpeechRecognition();
         rec.continuous = false; 
@@ -278,7 +275,6 @@ function setupVoice() {
         rec.onend = () => {
             stopVoiceUI();
             const finalVal = document.getElementById('userInput').value.trim();
-            // Small delay to ensure last word is captured
             if(finalVal !== '') {
                 setTimeout(() => handleSend(), 300);
             }
@@ -288,7 +284,7 @@ function setupVoice() {
             console.error("Voice Error: ", e.error);
             stopVoiceUI();
             if(e.error === 'not-allowed') {
-                alert("Microphone blocked. Click the 'Lock' icon in your browser URL bar and set Microphone to 'Allow'.");
+                alert("Permission Denied. Please click the Lock icon in the URL bar and 'Allow' the microphone.");
             }
         };
     }
@@ -302,10 +298,16 @@ function stopVoiceUI() {
 }
 
 function handleVoice() {
-    // 1. Initialize on first click (User Gesture)
+    // 1. Wake up Audio for PC Browsers
+    if (window.AudioContext && AudioContext.state === 'suspended') {
+        new AudioContext().resume();
+    }
+
+    // 2. Ensure engine exists
     if (!rec) setupVoice();
     if (!rec) return;
 
+    // 3. Toggle logic
     if (isRecording) {
         rec.stop();
     } else {
@@ -313,17 +315,11 @@ function handleVoice() {
         try {
             rec.start();
         } catch (err) {
-            console.warn("Rec already active or error:", err);
+            console.warn("Clean restart triggered.");
             rec.stop();
+            setTimeout(() => rec.start(), 100);
         }
     }
-    // Add this to ensure the audio context isn't 'suspended' on PC
-    if (window.AudioContext && AudioContext.state === 'suspended') {
-        new AudioContext().resume();
-    }
-
-    if (!rec) setupVoice();
-    // ... rest of your code
 }
     // --- CORE LOGIC ---
     function toggleToolsPopup() {
